@@ -1,0 +1,538 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SyncStore Control Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a formal operations console. Sticky header with the run controls, a module sidebar on the left,
+   and one module at a time on the right (Overview, the four agents, the optimiser, coordination, log, about).
+   Single light theme by design: off-white paper ground, white cards, navy ink. */
+:root {
+  color-scheme: light;
+  --bg: #F7F6F2; --panel: #FFFFFF; --panel-2: #F3F2ED; --ink: #1A2233; --muted: #5A6373; --line: #D9D7CF; --line-2: #E8E6E0;
+  --accent: #1F3A68; --on-accent: #FFFFFF;
+  --ledger: #85562A; --relay: #2C6A60; --promise: #5A4A8A; --captain: #1F3A68; --opt: #57616F;
+  --ledger-bg: #F3EBE2; --relay-bg: #E4EEEB; --promise-bg: #ECE9F3; --captain-bg: #E6EBF3; --opt-bg: #ECEDEF;
+  --good: #2E6B47; --warn: #8A6414; --bad: #9B2C2C; --good-bg: #E7EFE9; --warn-bg: #F5EEDC; --bad-bg: #F5E5E3;
+  --floor: #FBFAF7; --grid: #EEECE6; --rack: #CDD2D8; --rack-edge: #9AA3AE; --chill: #E4ECF5; --frozen: #ECE8F2;
+  --display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --body: 'Source Sans 3', 'Segoe UI', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --r: 6px; --head-h: 76px;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--body); font-size: 18px; line-height: 1.5; margin: 0; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--panel); }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.5; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1640px; margin: 0 auto; }
+
+/* Header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding-block: 12px; }
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 { font-size: 27px; font-weight: 700; line-height: 1.05; letter-spacing: -0.005em; }
+.brand p { color: var(--muted); font-size: 15.5px; margin-top: 2px; }
+.clock { display: flex; align-items: center; gap: 14px; padding-left: 24px; border-left: 1px solid var(--line); }
+.clock .time { font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: -0.01em; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-left: auto; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 14px; border-radius: var(--r); font-weight: 600; font-size: 16px; display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--panel-2); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn.primary:hover { background: #2A4B82; }
+.btn.small { padding: 4px 10px; font-size: 15px; }
+.btn.link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 7px 13px; font-weight: 600; font-size: 16px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.lbl { font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.divider { width: 1px; align-self: stretch; background: var(--line); }
+.demo-bar { border-top: 1px solid var(--line); background: var(--panel-2); }
+.demo-bar .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-block: 10px; }
+
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border-radius: 999px; font-weight: 600; font-size: 15.5px; white-space: nowrap; border: 1px solid currentColor; }
+.pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.m-trough { color: var(--opt); background: var(--opt-bg); }
+.m-normal { color: var(--good); background: var(--good-bg); }
+.m-peak { color: var(--warn); background: var(--warn-bg); }
+.m-surge { color: var(--bad); background: var(--bad-bg); }
+.m-off { color: var(--muted); background: var(--panel-2); }
+
+/* Shell: sidebar + module */
+.shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 28px; padding-block: 24px 48px; align-items: start; }
+.side { position: sticky; top: calc(var(--head-h) + 20px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 18px; }
+.side .group { display: flex; flex-direction: column; gap: 2px; }
+.side .lbl { padding: 0 12px 6px; }
+.nav { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 12px; align-items: center; text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: var(--r); font-size: 17px; font-weight: 500; color: var(--ink); }
+.nav:hover { background: var(--panel-2); }
+.nav[aria-current="page"] { background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); font-weight: 700; }
+.nav .dot { width: 10px; height: 10px; border-radius: 2px; background: var(--line); }
+.nav .count { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+.nav .count.alert { color: var(--bad); font-weight: 600; }
+.side .meta { font-size: 15px; color: var(--muted); padding: 12px; border-top: 1px solid var(--line); }
+
+main { min-width: 0; }
+.module { display: flex; flex-direction: column; gap: 22px; }
+.mod-head { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: flex-end; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.mod-head .kicker { font-size: 14px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.mod-head h2 { font-size: 36px; line-height: 1.12; margin-top: 4px; }
+.mod-head p { color: var(--muted); margin-top: 6px; max-width: 70ch; }
+.mod-head .actions { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); display: flex; flex-direction: column; min-width: 0; }
+.card-h { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; padding: 16px 20px 12px; border-bottom: 1px solid var(--line-2); }
+.card-h h3 { font-size: 22px; }
+.card-h .sub { color: var(--muted); font-size: 16px; }
+.card-h .right { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.card-b { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.note { font-size: 15.5px; color: var(--muted); }
+.cols { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.cols.wide-left { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); }
+.stack { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+/* Agent markers */
+.tag { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.tag i { width: 10px; height: 10px; border-radius: 2px; background: currentColor; display: inline-block; }
+.t-ledger { color: var(--ledger); } .t-relay { color: var(--relay); } .t-promise { color: var(--promise); } .t-captain { color: var(--captain); } .t-opt, .t-system { color: var(--opt); }
+.d-ledger { background: var(--ledger) !important; } .d-relay { background: var(--relay) !important; } .d-promise { background: var(--promise) !important; } .d-captain { background: var(--captain) !important; } .d-opt { background: var(--opt) !important; }
+
+/* Status banner: one sentence answering "is the store OK?" */
+.status { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; padding: 18px 22px; border-radius: var(--r); border: 1px solid; border-left-width: 8px; }
+.status .msg { flex: 1 1 320px; min-width: 0; }
+.status .big { display: block; font-family: var(--display); font-size: 30px; font-weight: 700; line-height: 1.15; }
+.status .line { display: block; font-size: 18px; margin-top: 4px; }
+.s-good { background: var(--good-bg); border-color: var(--good); } .s-good .big { color: var(--good); }
+.s-warn { background: var(--warn-bg); border-color: var(--warn); } .s-warn .big { color: var(--warn); }
+.s-bad { background: var(--bad-bg); border-color: var(--bad); } .s-bad .big { color: var(--bad); }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.kpi { padding: 18px 22px; display: flex; flex-direction: column; gap: 4px; min-width: 0; border-right: 1px solid var(--line-2); }
+.kpi:last-child { border-right: 0; }
+.kpi .v { font-family: var(--mono); font-size: 52px; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.more { margin-top: -10px; }
+.more summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 16px; padding: 4px 0; }
+.more[open] summary { margin-bottom: 10px; }
+.more .stats { background: var(--panel); }
+.tech-more { border-top: 1px solid var(--line); padding-top: 14px; }
+.tech-more > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 17px; padding: 4px 0; }
+.tech-more[open] > summary { margin-bottom: 14px; }
+.now-card .agent { padding: 0; }
+.now-card .agent .now { font-size: 20px; }
+
+/* Needs your attention */
+.attn { list-style: none; margin: 0; padding: 0; }
+.attn li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line-2); }
+.attn li:first-child { padding-top: 0; }
+.attn li:last-child { border-bottom: 0; padding-bottom: 0; }
+.attn .chip { justify-self: start; }
+.attn .what b { display: block; font-size: 18px; font-weight: 600; }
+.attn .what span { display: block; color: var(--muted); font-size: 16px; }
+.attn .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.all-clear { font-size: 18px; font-weight: 600; }
+
+/* What the agents just did */
+.did { list-style: none; margin: 0; padding: 0; }
+.did li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
+.did li:first-child { padding-top: 0; }
+.did li:last-child { border-bottom: 0; padding-bottom: 0; }
+.did .tm { font-family: var(--mono); color: var(--muted); font-size: 15px; padding-top: 2px; }
+.did .tag { font-size: 12.5px; }
+.did b { display: block; font-size: 17.5px; font-weight: 600; line-height: 1.35; margin-top: 1px; }
+.did .why { font-size: 15.5px; }
+.did .tech { display: block; margin-top: 6px; padding: 6px 10px; background: var(--panel-2); border-radius: var(--r); font-size: 14.5px; color: var(--muted); }
+.did .tech .via { margin-right: 6px; }
+.feed-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 15px; color: var(--muted); border-top: 1px solid var(--line-2); padding-top: 10px; }
+.kpi .v small { font-size: 19px; color: var(--muted); letter-spacing: 0; }
+.kpi .cmp { font-size: 15.5px; color: var(--muted); line-height: 1.35; }
+.delta { font-weight: 700; }
+.good-t { color: var(--good); } .bad-t { color: var(--bad); } .warn-t { color: var(--warn); }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line-2); border-radius: var(--r); }
+.stat { padding: 12px 16px; display: flex; flex-direction: column; border-right: 1px solid var(--line-2); min-width: 0; }
+.stat:last-child { border-right: 0; }
+.stat .v { font-family: var(--mono); font-size: 27px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat .l { font-size: 15px; color: var(--muted); line-height: 1.3; }
+
+/* Demo steps */
+.steps { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.step { padding: 12px 14px; border-right: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 15px; color: var(--muted); line-height: 1.3; position: relative; }
+.step:last-child { border-right: 0; }
+.step .n { font-family: var(--mono); font-size: 13.5px; }
+.step b { color: var(--ink); font-size: 16px; font-weight: 600; }
+.step.done::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--accent); }
+.step.done .n { color: var(--accent); font-weight: 600; }
+
+/* Agent cards: job, what it is doing now, one number; technical detail on request */
+.agents { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line-2); border-radius: 0 0 var(--r) var(--r); overflow: hidden; }
+.agent { display: flex; flex-direction: column; gap: 6px; padding: 14px 18px 16px; background: var(--panel); min-width: 0; }
+
+.agent .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.agent .job { color: var(--muted); font-size: 15.5px; }
+.agent .head .btn.link { margin-left: auto; font-size: 15.5px; }
+.agent .now { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 17.5px; font-weight: 600; line-height: 1.35; }
+.agent .now i { width: 10px; height: 10px; border-radius: 50%; transform: translateY(-1px); }
+.st-good { background: var(--good); } .st-warn { background: var(--warn); } .st-bad { background: var(--bad); } .st-off { background: var(--rack-edge); }
+.agent .num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 15.5px; color: var(--muted); padding-left: 20px; }
+.agent .num b { font-family: var(--mono); color: var(--ink); font-size: 18px; font-weight: 500; margin-right: 4px; }
+.agent .num .btn.link { margin-left: auto; font-size: 14.5px; font-weight: 500; color: var(--muted); }
+.agent .tech { margin: 4px 0 0 20px; padding: 8px 12px; background: var(--panel-2); border-radius: var(--r); font-size: 14.5px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+
+/* Map */
+.map-wrap { padding: 10px 14px 0; }
+#map { width: 100%; height: auto; max-height: 560px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; color: var(--muted); padding: 8px 20px 14px; }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.sw { width: 13px; height: 13px; border-radius: 2px; display: inline-block; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 16.5px; }
+th { text-align: left; font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+th.n { text-align: right; }
+.bar { position: relative; height: 8px; border-radius: 4px; background: var(--line-2); min-width: 80px; overflow: hidden; }
+.bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.meter { display: flex; align-items: center; gap: 10px; }
+.meter .mono { font-size: 15px; min-width: 42px; }
+.chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 14.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.c-good { background: var(--good-bg); color: var(--good); border-color: #C9DCCF; } .c-warn { background: var(--warn-bg); color: var(--warn); border-color: #E7D7AE; } .c-bad { background: var(--bad-bg); color: var(--bad); border-color: #E7C4C0; }
+.c-info { background: var(--captain-bg); color: var(--captain); border-color: #CBD5E6; } .c-mute { background: var(--panel-2); color: var(--muted); border-color: var(--line); }
+.c-promise { background: var(--promise-bg); color: var(--promise); border-color: #D5CFE6; } .c-relay { background: var(--relay-bg); color: var(--relay); border-color: #C6DCD6; }
+.you { font-size: 12.5px; font-weight: 700; color: var(--promise); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Captain */
+.modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.mode { padding: 12px 14px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; font-size: 15px; color: var(--muted); }
+.mode:last-child { border-right: 0; }
+.mode b { font-family: var(--display); font-size: 19px; color: var(--ink); font-weight: 600; }
+.mode.on { box-shadow: inset 0 -3px 0 currentColor; }
+.mode.on.m-trough { background: var(--opt-bg); color: var(--opt); } .mode.on.m-normal { background: var(--good-bg); color: var(--good); } .mode.on.m-peak { background: var(--warn-bg); color: var(--warn); } .mode.on.m-surge { background: var(--bad-bg); color: var(--bad); }
+.voice { display: flex; flex-direction: column; gap: 8px; }
+.voice .hi { font-size: 21px; line-height: 1.55; font-family: var(--body); font-weight: 500; padding: 14px 16px; background: var(--captain-bg); border-left: 3px solid var(--captain); }
+.voice .en { font-size: 16px; color: var(--muted); }
+.approval { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 14px; border: 1px solid #E7D7AE; border-radius: var(--r); background: var(--warn-bg); }
+.approval p { flex: 1 1 220px; }
+.rules { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.rules li span { display: block; color: var(--muted); font-size: 15.5px; }
+#fc { width: 100%; height: auto; display: block; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 16px; color: var(--muted); }
+.check input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+
+/* Promise */
+.shelf-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.shelf-picker button { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 6px 11px; font-size: 15.5px; }
+.shelf-picker button[aria-pressed="true"] { border-color: var(--promise); background: var(--promise-bg); color: var(--promise); font-weight: 600; }
+.cart { display: flex; flex-direction: column; gap: 10px; }
+.cart-item { border: 1px solid var(--line-2); border-radius: var(--r); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+.cart-item .top-line { display: flex; justify-content: space-between; gap: 10px; }
+.ask { border-left: 3px solid var(--promise); padding-left: 12px; display: flex; flex-direction: column; gap: 4px; }
+.ask label { display: flex; gap: 8px; align-items: center; font-size: 15.5px; }
+.ask input { accent-color: var(--promise); }
+.feed { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.feed li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; font-size: 16px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.feed li:last-child { border-bottom: 0; }
+.feed .tm { font-family: var(--mono); color: var(--muted); font-size: 15px; }
+
+/* Optimiser */
+.trolleys { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.trolley { border: 1px solid var(--line-2); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 15.5px; }
+.trolley .who { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.totes { display: flex; gap: 4px; flex-wrap: wrap; }
+.tote { font-family: var(--mono); font-size: 13.5px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); background: var(--panel-2); }
+.prog { height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+.prog i { display: block; height: 100%; background: var(--accent); }
+
+/* Log + guardrails */
+.log { list-style: none; margin: 0; padding: 0; }
+.log li { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line-2); align-items: start; }
+.log li:last-child { border-bottom: 0; }
+.log .tm { font-family: var(--mono); color: var(--muted); font-size: 15.5px; padding-top: 1px; }
+.log .tag { padding-top: 3px; }
+.log .hi { display: block; color: var(--muted); font-size: 16px; margin-top: 3px; }
+.would { font-weight: 700; color: var(--warn); }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 13px; font-size: 15px; font-weight: 600; }
+.filters button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.guard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.guard li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.guard li:last-child { border-bottom: 0; }
+.guard .ok { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--good-bg); color: var(--good); border: 1px solid #C9DCCF; margin-top: 2px; }
+.guard .ok.alert { background: var(--warn-bg); color: var(--warn); border-color: #E7D7AE; }
+.guard small { display: block; color: var(--muted); font-size: 15.5px; }
+.about p + p { margin-top: 12px; }
+.about b { font-weight: 600; }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: #FFFFFF; padding: 12px 18px; border-radius: var(--r); font-weight: 500; z-index: 40; max-width: min(460px, calc(100vw - 32px)); box-shadow: 0 6px 24px rgba(26, 34, 51, 0.18); }
+
+/* Map SVG */
+.mf { fill: var(--floor); } .mg { stroke: var(--grid); stroke-width: 1; }
+.mrack { fill: var(--rack); stroke: var(--rack-edge); stroke-width: 1; }
+.mchill { fill: var(--chill); } .mfrozen { fill: var(--frozen); }
+.mlabel { fill: var(--muted); font-family: var(--mono); font-size: 14px; letter-spacing: 0.04em; }
+.mtitle { fill: var(--ink); font-family: var(--display); font-size: 17px; font-weight: 600; }
+.mzone { fill: none; stroke: var(--rack-edge); stroke-dasharray: 6 6; }
+.mbench { fill: var(--panel); stroke: var(--rack-edge); }
+.mbay { fill: var(--panel); stroke: var(--rack-edge); stroke-dasharray: 4 4; }
+.sku-live { fill: var(--good); } .sku-low { fill: var(--warn); } .sku-hidden { fill: var(--bad); } .sku-out { fill: var(--muted); }
+.heat { fill: var(--bad); }
+.pk circle { stroke: var(--panel); stroke-width: 2.5; }
+.pk text { font-family: var(--body); font-weight: 700; font-size: 14px; fill: #FFFFFF; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.pk.idle circle { fill: var(--rack-edge); } .pk.discrete circle, .pk.cluster circle, .pk.zone circle { fill: var(--ink); }
+.pk.joining { opacity: 0.45; }
+.pk .badge { fill: var(--ink); } .pk .badge-t { fill: #FFFFFF; font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.rider { fill: var(--relay); } .bag { fill: var(--promise); }
+.count-ring { fill: none; stroke: var(--ledger); stroke-width: 2.5; stroke-dasharray: 5 4; }
+
+@media (max-width: 1360px) {
+  .cols.wide-left { grid-template-columns: minmax(0, 1fr); }
+  .agents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .step:nth-child(4) { border-right: 0; } .step:nth-child(-n+4) { border-bottom: 1px solid var(--line-2); }
+}
+@media (max-width: 1040px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 18px; padding-top: 14px; }
+  .side { position: static; flex-direction: row; overflow-x: auto; gap: 0; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  .side .group { flex-direction: row; gap: 4px; }
+  .side .lbl, .side .meta { display: none; }
+  .nav { grid-template-columns: 10px auto auto; white-space: nowrap; font-size: 16px; padding: 8px 12px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .controls { margin-left: 0; }
+  .clock { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 640px) {
+  body { font-size: 17px; }
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+  .kpi { border-right: 0; border-bottom: 1px solid var(--line-2); }
+  .kpi:last-child { border-bottom: 0; }
+  .kpi .v { font-size: 40px; }
+  .status .big { font-size: 25px; }
+  .attn li { grid-template-columns: minmax(0, 1fr); }
+  .agents { grid-template-columns: minmax(0, 1fr); }
+  .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .step { border-bottom: 1px solid var(--line-2); } .step:nth-child(2n) { border-right: 0; }
+  .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mode:nth-child(2) { border-right: 0; } .mode:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .log li { grid-template-columns: 76px minmax(0, 1fr); }
+  .log li .txt { grid-column: 1 / -1; }
+  .mod-head h2 { font-size: 29px; }
+  .divider { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="5" fill="#1F3A68"/><rect x="8" y="8" width="10" height="10" rx="1.5" fill="#E9DCCB"/><rect x="22" y="8" width="10" height="10" rx="1.5" fill="#FFFFFF"/><rect x="8" y="22" width="10" height="10" rx="1.5" fill="#FFFFFF"/><rect x="22" y="22" width="10" height="10" rx="1.5" fill="#B9C6DC"/></svg>
+      <div><h1>SyncStore</h1><p>Dark store MUM-114, Andheri East · simulated</p></div>
+    </div>
+    <div class="clock"><span class="time" id="clock">18:44:00</span><span class="pill m-normal" id="modePill">Normal</span><span class="pill m-off" id="pausedPill" hidden>Paused</span></div>
+    <div class="controls">
+      <span class="pill m-peak" id="thinking" hidden>Thinking…</span>
+      <span class="pill m-off" id="conn">Connecting</span>
+      <button class="btn" id="demoToggle" type="button" aria-expanded="false" aria-controls="demoBar">Demo controls ▾</button>
+    </div>
+  </div>
+  <!-- Demo controls: for running the simulation in front of judges, not for the shift lead. Closed by default. -->
+  <div class="demo-bar" id="demoBar" hidden>
+    <div class="wrap">
+      <button class="btn primary" id="play" type="button">Pause</button>
+      <select class="btn" id="speed" aria-label="Simulation speed"><option value="1">1× speed</option><option value="5">5× speed</option><option value="10" selected>10× speed</option><option value="20">20× speed</option><option value="60">60× speed</option></select>
+      <button class="btn" id="demo" type="button">Run peak-hour demo</button>
+      <button class="btn" id="reset" type="button">Reset</button>
+      <span class="divider" aria-hidden="true"></span>
+      <span class="lbl">Agent layer</span>
+      <div class="seg" role="group" aria-label="Agent layer">
+        <button type="button" data-layer="live" aria-pressed="true">Live</button>
+        <button type="button" data-layer="shadow" aria-pressed="false">Shadow</button>
+        <button type="button" data-layer="off" aria-pressed="false">Off</button>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+      <span class="lbl">Decisions</span>
+      <div class="seg" role="group" aria-label="How agents decide">
+        <button type="button" data-llm="1" aria-pressed="true">Groq LLM</button>
+        <button type="button" data-llm="0" aria-pressed="false">Rules</button>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+      <span class="lbl">Create an event</span>
+      <select class="btn" id="emptySku" aria-label="Item to empty"></select>
+      <button class="btn" type="button" id="doEmpty">Empty this shelf</button>
+      <button class="btn" type="button" id="doLate">Make a rider late</button>
+      <button class="btn" type="button" id="doSpike">Demand spike</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap shell">
+  <nav class="side" aria-label="Modules">
+    <div class="group">
+      <span class="lbl">Store</span>
+      <button class="nav" type="button" data-nav="overview"><span class="dot" style="background:var(--ink)"></span>Overview<span class="count" id="nc-overview"></span></button>
+    </div>
+    <div class="group">
+      <span class="lbl">Agents</span>
+      <button class="nav" type="button" data-nav="captain"><span class="dot d-captain"></span>Captain<span class="count" id="nc-captain"></span></button>
+      <button class="nav" type="button" data-nav="ledger"><span class="dot d-ledger"></span>Ledger<span class="count" id="nc-ledger"></span></button>
+      <button class="nav" type="button" data-nav="relay"><span class="dot d-relay"></span>Relay<span class="count" id="nc-relay"></span></button>
+      <button class="nav" type="button" data-nav="promise"><span class="dot d-promise"></span>Promise<span class="count" id="nc-promise"></span></button>
+    </div>
+    <div class="group">
+      <span class="lbl">Behind the scenes</span>
+      <button class="nav" type="button" data-nav="optimiser"><span class="dot d-opt"></span>Fast optimiser<span class="count"></span></button>
+      <button class="nav" type="button" data-nav="coordination"><span class="dot" style="background:var(--rack-edge)"></span>How agents sync<span class="count"></span></button>
+      <button class="nav" type="button" data-nav="log"><span class="dot" style="background:var(--rack-edge)"></span>Full action log<span class="count"></span></button>
+      <button class="nav" type="button" data-nav="about"><span class="dot" style="background:var(--line)"></span>About this prototype<span class="count"></span></button>
+    </div>
+    <p class="meta">A simulated store. Every number is compared with today’s fixed plan on the same orders.</p>
+  </nav>
+
+  <main>
+    <!-- Overview -->
+    <section class="module" id="mod-overview" aria-labelledby="h-overview">
+      <div class="mod-head">
+        <div><span class="kicker">Store overview</span><h2 id="h-overview">Evening shift at a glance</h2></div>
+      </div>
+      <div class="status s-good" id="status" role="status"></div>
+      <div class="card" id="storyCard" hidden>
+        <div class="card-h"><h3>Demo: match-night rush, step by step</h3><span class="sub">Each step lights up when it really happens in the store.</span></div>
+        <div class="steps" id="story"></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <details class="more">
+        <summary>Compare with today’s plan (pick time, walking, records fixed)</summary>
+        <div id="kpiMore"></div>
+      </details>
+      <div class="cols">
+        <div class="card">
+          <div class="card-h"><h3>Needs your attention</h3><span class="sub" id="attnSub"></span></div>
+          <div class="card-b" id="attn"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>What the agents just did</h3>
+            <div class="right"><button class="btn link" type="button" id="feedRoutine">Show routine checks</button><button class="btn link" type="button" id="feedTech">Show details</button></div></div>
+          <div class="card-b" id="acts"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Agents</h3><span class="sub">What each one is doing now</span></div>
+        <div class="agents" id="agentCards"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Store floor</h3><span class="sub" id="floorRole">Pickers, shelves, packing bench and rider bay</span><div class="right"><span class="chip c-mute" id="floorMethod"></span></div></div>
+        <div class="map-wrap"><svg id="map" viewBox="0 0 1000 560" role="img" aria-label="Dark store floor plan with moving pickers"></svg></div>
+        <div class="legend">
+          <span><i class="sw" style="background:var(--ink);border-radius:50%"></i>Picker (number = orders on the trolley)</span>
+          <span><i class="sw" style="background:var(--rack-edge);border-radius:50%"></i>Picker waiting</span>
+          <span><i class="sw" style="background:var(--good)"></i>Item OK</span>
+          <span><i class="sw" style="background:var(--warn)"></i>Being watched</span>
+          <span><i class="sw" style="background:var(--bad)"></i>Hidden from the app</span>
+          <span><i class="sw" style="background:none;border:2px dashed var(--ledger);border-radius:50%"></i>Count or refill under way</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Captain -->
+    <section class="module" id="mod-captain" aria-labelledby="h-captain" hidden>
+      <div class="mod-head"><div><span class="kicker"><span class="tag t-captain"><i></i>Captain</span> · Agent 1 of 4</span><h2 id="h-captain">Shift assistant</h2><p>Watches the order forecast, switches the store between Quiet, Normal, Busy and Very busy, asks you before calling extra staff, and briefs you in Hindi.</p></div></div>
+      <div id="captain" class="cols"></div>
+      <details class="tech-more"><summary>Technical details</summary><div id="captain-tech" class="cols"></div></details>
+    </section>
+
+    <!-- Ledger -->
+    <section class="module" id="mod-ledger" aria-labelledby="h-ledger" hidden>
+      <div class="mod-head"><div><span class="kicker"><span class="tag t-ledger"><i></i>Ledger</span> · Agent 2 of 4</span><h2 id="h-ledger">Stock checker</h2><p>Every time a picker finds a shelf empty, Ledger trusts that item’s stock record less. When the record can’t be trusted, it hides the item from the app, sends a 30-second count and asks for a refill from the backroom.</p></div></div>
+      <div id="ledger" class="cols"></div>
+      <details class="tech-more"><summary>Technical details</summary><div id="ledger-tech" class="stack"></div></details>
+    </section>
+
+    <!-- Relay -->
+    <section class="module" id="mod-relay" aria-labelledby="h-relay" hidden>
+      <div class="mod-head"><div><span class="kicker"><span class="tag t-relay"><i></i>Relay</span> · Agent 3 of 4</span><h2 id="h-relay">Rider-first packing</h2><p>Decides which order goes to the pickers first, so the bag for the rider who arrives first is ready first. If a rider is late, it moves another order ahead.</p></div></div>
+      <div id="relay" class="stack"></div>
+      <details class="tech-more"><summary>Technical details</summary><div id="relay-tech" class="stack"></div></details>
+    </section>
+
+    <!-- Promise -->
+    <section class="module" id="mod-promise" aria-labelledby="h-promise" hidden>
+      <div class="mod-head"><div><span class="kicker"><span class="tag t-promise"><i></i>Promise</span> · Agent 4 of 4</span><h2 id="h-promise">Missing items</h2><p>Asks customers before they pay: if this item runs out, swap or refund? When an item is missing, it does exactly what the customer chose. It never guesses and never cancels the whole order.</p></div></div>
+      <div id="promise" class="stack"></div>
+      <details class="tech-more"><summary>Technical details</summary><div id="promise-tech" class="stack"></div></details>
+    </section>
+
+    <!-- Optimiser -->
+    <section class="module" id="mod-optimiser" aria-labelledby="h-opt" hidden>
+      <div class="mod-head"><div><span class="kicker"><span class="tag t-opt"><i></i>Optimiser</span> · Plain code, not an agent</span><h2 id="h-opt">Fast optimiser</h2><p>Batches orders, routes each trolley and assigns pickers every 5 seconds, in milliseconds. The agents change only its inputs and limits.</p></div></div>
+      <div id="opt" class="stack"></div>
+    </section>
+
+    <!-- Coordination -->
+    <section class="module" id="mod-coordination" aria-labelledby="h-coord" hidden>
+      <div class="mod-head"><div><span class="kicker">How the agents stay in sync</span><h2 id="h-coord">Coordination and guardrails</h2><p>Agents never call each other. Events go through one bus, every agent writes only the shared-state fields it owns, and hard limits live in code, so no LLM proposal can override them.</p></div></div>
+      <div class="card"><div class="card-h"><h3>Event bus</h3><span class="sub">Live: which agent handled which event, and how it decided</span></div><div class="card-b" id="trace"></div></div>
+      <div class="card"><div class="card-h"><h3>Shared store state</h3><span class="sub">One writer per field; everyone reads</span></div><div class="card-b"><div class="tbl-wrap" id="state"></div></div></div>
+      <div class="cols">
+        <div class="card"><div class="card-h"><h3>Guardrails</h3><span class="sub">Live status</span></div><div class="card-b" id="guard"></div></div>
+        <div class="card"><div class="card-h"><h3>LLM runtime</h3><span class="sub">Groq, shared by all sessions</span></div><div class="card-b" id="llmCard"></div></div>
+      </div>
+    </section>
+
+    <!-- Log -->
+    <section class="module" id="mod-log" aria-labelledby="h-log" hidden>
+      <div class="mod-head"><div><span class="kicker">Audit trail</span><h2 id="h-log">Action log</h2><p>Every action, with a one-line reason the shift lead can read, hear or override.</p></div>
+        <div class="actions filters" id="filters">
+          <button type="button" data-f="all" aria-pressed="true">All</button>
+          <button type="button" data-f="captain" aria-pressed="false">Captain</button>
+          <button type="button" data-f="ledger" aria-pressed="false">Ledger</button>
+          <button type="button" data-f="relay" aria-pressed="false">Relay</button>
+          <button type="button" data-f="promise" aria-pressed="false">Promise</button>
+          <button type="button" data-f="system" aria-pressed="false">System</button>
+        </div></div>
+      <div class="card"><div class="card-b"><ul class="log" id="log"></ul></div></div>
+    </section>
+
+    <!-- About -->
+    <section class="module" id="mod-about" aria-labelledby="h-about" hidden>
+      <div class="mod-head"><div><span class="kicker">Method</span><h2 id="h-about">About this prototype</h2><p>How the platform is built, what is simulated, and how to use the controls.</p></div></div>
+      <div class="cols">
+        <div class="card"><div class="card-h"><h3>The platform</h3></div><div class="card-b about">
+          <p><b>Four separate agents.</b> Ledger, Captain, Relay and Promise are independent modules on a Python server. Each has its own prompt, its own tools, the events it wakes on, and plain-code “sense” logic that watches the store.</p>
+          <p><b>How an agent decides.</b> It sends a compact JSON view of the store to a Groq-hosted LLM, which answers with tool calls. Every call is checked against hard limits in code before it runs. If the LLM is off, over budget or slow, the agent uses its own rules, so the store never stops.</p>
+          <p><b>How they stay in sync.</b> Agents never call each other. They write only the shared-state fields they own; those writes raise events that the bus routes to the next agent, all within the same simulated second. The fast optimiser is plain code that reads what the agents set.</p>
+        </div></div>
+        <div class="card"><div class="card-h"><h3>The simulation and controls</h3></div><div class="card-b about">
+          <p><b>Two stores, same orders.</b> One simulated dark store (8 aisles, 24 items, 6 pickers, 2 packers) runs twice on an identical stream of orders from 18:30 to 20:30: once with SyncStore and once with today’s static plan. Silent stock losses are built in (milk, chips, paneer, cola).</p>
+          <p>All controls sit under <b>Demo controls</b> in the header. <b>Run peak-hour demo</b> restarts at 18:38 at 20× speed. <b>Agent layer:</b> Live runs the floor, Shadow only logs what the agents would do, Off shows the fail-safe. <b>Decisions:</b> switch between the Groq LLM and the agents’ rules.</p>
+          <p><b>Create an event</b> from Demo controls in the header: empty any shelf, make a rider late, or add a burst of orders. The Promise module has a checkout you can try yourself.</p>
+        </div></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<style>
+.via { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0 7px; border-radius: 3px; border: 1px solid; vertical-align: 2px; white-space: nowrap; }
+.via-llm { color: var(--promise); background: var(--promise-bg); border-color: #D5CFE6; }
+.via-rules { color: var(--opt); background: var(--opt-bg); border-color: var(--line); }
+.via-code { color: var(--muted); background: var(--panel-2); border-color: var(--line); }
+.via-block { color: var(--bad); background: var(--bad-bg); border-color: #E7C4C0; }
+.via-human { color: var(--good); background: var(--good-bg); border-color: #C9DCCF; }
+.via-think { color: var(--warn); background: var(--warn-bg); border-color: #E7D7AE; }
+.why { display: block; color: var(--muted); font-size: 15px; margin-top: 2px; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
+.seg button:disabled { opacity: 0.45; }
+</style>
+<script src="/static/app.js"></script>
+</body></html>
